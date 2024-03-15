@@ -1,0 +1,146 @@
+Sub AutoSections()
+
+    Dim intSlide As Integer
+    Dim strNotes As String
+    Dim tabSectionNames() As String
+    ReDim tabSectionNames(1)
+    Dim tabSectionSlides() As Integer
+    ReDim tabSectionSlides(1)
+    Dim sec As Integer
+    Dim secNumber As Integer
+    Dim texte As String
+    Dim debut As Integer
+    Dim longueur As Integer
+    Dim width As Integer
+    Dim barWidth As Integer
+    Dim Sep As String
+    Dim normalColor As Long
+    Dim emphColor As Long
+    Dim BackgroundColor As Long
+    Dim font As String
+    Dim size As Integer
+    Dim j As Integer
+    Dim visibleSlides As Integer
+
+    sec = 0
+    visibleSlides = 0
+
+    ' Initialize parameters
+    Sep = " "
+    normalColor = RGB(173, 185, 202)
+    emphColor = RGB(68, 84, 106)
+    BackgroundColor = RGB(222, 235, 247)
+    size = 14
+    font = "Eurostile"
+
+    width = ActivePresentation.PageSetup.SlideWidth
+
+    ' Process each slide for sections
+    With ActivePresentation
+        For intSlide = 1 To .Slides.Count
+            strNotes = .Slides(intSlide).NotesPage.Shapes.Placeholders(2).TextFrame.TextRange.Lines(1).Text
+            strNotes = Replace(strNotes, vbLf, "")
+            strNotes = Replace(strNotes, vbCr, "")
+            
+            ' Check for section in notes
+            If InStr(strNotes, "Section:") = 1 Then
+                sec = sec + 1
+                If sec > UBound(tabSectionNames) Then
+                    ReDim Preserve tabSectionNames(sec)
+                    ReDim Preserve tabSectionSlides(sec)
+                End If
+                tabSectionNames(sec) = Mid(strNotes, 9)
+                tabSectionSlides(sec) = intSlide
+            End If
+            
+            ' Count visible slides
+            If Not .Slides(intSlide).SlideShowTransition.Hidden Then
+                visibleSlides = visibleSlides + 1
+            End If
+        Next intSlide
+        
+        secNumber = sec ' Total number of sections
+
+        ' Update slides with sections
+        For intSlide = 1 To .Slides.Count
+            texte = ""
+            debut = 0
+            longueur = 0
+            
+            ' Add section names to navigation
+            If secNumber > 0 Then
+                For sec = 1 To secNumber
+                    If intSlide >= tabSectionSlides(sec) Then
+                        If sec = secNumber Then
+                            ' Code for last section
+                            If texte <> "" Then
+                                texte = texte & Sep
+                                debut = Len(texte) + 1 - Len(tabSectionNames(sec))
+                            End If
+                            texte = texte & tabSectionNames(sec)
+                            longueur = Len(tabSectionNames(sec))
+                        ElseIf intSlide < tabSectionSlides(sec + 1) Then
+                            ' Code for other sections
+                            If texte <> "" Then
+                                texte = texte & Sep
+                                debut = Len(texte) + 1 - Len(tabSectionNames(sec))
+                            End If
+                            texte = texte & tabSectionNames(sec)
+                            longueur = Len(tabSectionNames(sec))
+                        End If
+                    End If
+                Next sec
+            End If
+            
+            ' Remove existing shapes
+            For j = .Slides(intSlide).Shapes.Count To 1 Step -1
+                With .Slides(intSlide).Shapes(j)
+                    If .Name = "MyText" Or .Name = "MyBar1" Or .Name = "MyBar2" Then
+                        .Delete
+                    End If
+                End With
+            Next j
+            
+            ' Add navigation and progress if there's a section
+            If secNumber > 0 And intSlide >= tabSectionSlides(1) Then
+                ' Text box for navigation
+                With .Slides(intSlide).Shapes.AddTextbox(Orientation:=msoTextOrientationHorizontal, _
+                        Left:=5, Top:=3, width:=width - 0, Height:=50)
+                    .Name = "MyText"
+                    With .TextFrame.TextRange
+                        .Text = texte
+                        .font.size = size
+                        .font.Name = font
+                        .font.Color.RGB = normalColor
+                        .Characters(debut, longueur).font.Bold = msoTrue
+                        .Characters(debut, longueur).font.Color.RGB = emphColor
+                    End With
+                End With
+                
+                ' Background for navigation
+                With .Slides(intSlide).Shapes.AddShape(Type:=msoShapeRectangle, Left:=-1, Top:=0, width:=width + 1, Height:=3)
+                    .Fill.ForeColor.RGB = BackgroundColor
+                    .Line.Visible = msoFalse
+                    .Name = "MyBar1"
+                End With
+                
+                ' Progress bar calculation and addition
+                barWidth = Int((width - 0) * (intSlide - tabSectionSlides(1)) / Max(visibleSlides - 1, 1))
+                With .Slides(intSlide).Shapes.AddShape(Type:=msoShapeRectangle, Left:=-1, Top:=0, width:=barWidth + 1, Height:=3)
+                    .Fill.ForeColor.RGB = emphColor
+                    .Line.Visible = msoFalse
+                    .Name = "MyBar2"
+                End With
+            End If
+        Next intSlide
+    End With
+End Sub
+
+Function Max(ByVal Value1 As Integer, ByVal Value2 As Integer) As Integer
+    If Value1 > Value2 Then
+        Max = Value1
+    Else
+        Max = Value2
+    End If
+End Function
+
